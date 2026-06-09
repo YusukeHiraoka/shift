@@ -64,11 +64,27 @@
     function ShiftApp() {
       const [today] = React.useState(new Date());
       const [weekOffset, setWeekOffset] = React.useState(0);
-      // hopeShifts: 希望シフト { dateKey: [slot, ...] }
-      // confirmedShifts: 確定シフト { dateKey: [slot, ...] }
-      const [hopeShifts, setHopeShifts] = React.useState({});
-      const [confirmedShifts, setConfirmedShifts] = React.useState({});
+
+      // ローカルストレージから初期値を読み込む
+      const loadStorage = (key, fallback) => {
+        try {
+          const val = localStorage.getItem(key);
+          return val ? JSON.parse(val) : fallback;
+        } catch(e) { return fallback; }
+      };
+
+      const [hopeShifts, setHopeShifts] = React.useState(() => loadStorage("hopeShifts", {}));
+      const [confirmedShifts, setConfirmedShifts] = React.useState(() => loadStorage("confirmedShifts", {}));
       const [mode, setMode] = React.useState("hope"); // "hope" | "confirm"
+
+      // 変更があるたびにローカルストレージへ保存
+      React.useEffect(() => {
+        try { localStorage.setItem("hopeShifts", JSON.stringify(hopeShifts)); } catch(e) {}
+      }, [hopeShifts]);
+
+      React.useEffect(() => {
+        try { localStorage.setItem("confirmedShifts", JSON.stringify(confirmedShifts)); } catch(e) {}
+      }, [confirmedShifts]);
 
       const baseDate = new Date(today);
       baseDate.setDate(today.getDate() + weekOffset * 7);
