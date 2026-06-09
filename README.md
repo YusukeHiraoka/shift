@@ -23,7 +23,7 @@ https://yusukehiraoka.github.io/shift/
   - A: 15:05〜16:35
   - B: 16:40〜18:10
 
-## 🛠 使用している技術
+## 使用している技術
 - HTML5 / CSS3
 - React (18.2.0)
 - Babel (7.23.2)
