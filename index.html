@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>シフト管理 - 塾バイト</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #F7F8FC; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const WEEKDAY_SHIFTS = ["B", "C", "D"];
+    const WEEKEND_SHIFTS = ["Y", "Z", "A", "B"];
+
+    const SHIFT_LABELS = {
+      A: { label: "A", time: "15:05〜16:35", color: "#6C9BCF" },
+      B: { label: "B", time: "16:40〜18:10", color: "#5BAD8F" },
+      C: { label: "C", time: "18:15〜19:45", color: "#E07B54" },
+      D: { label: "D", time: "19:50〜21:20", color: "#9B6BB5" },
+      Y: { label: "Y", time: "（午前）", color: "#D4A843" },
+      Z: { label: "Z", time: "（午後）", color: "#C0556A" },
+    };
+
+    const DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"];
+
+    function getWeekDates(baseDate) {
+      const d = new Date(baseDate);
+      const day = d.getDay();
+      const monday = new Date(d);
+      monday.setDate(d.getDate() - ((day + 6) % 7));
+      return Array.from({ length: 7 }, (_, i) => {
+        const date = new Date(monday);
+        date.setDate(monday.getDate() + i);
+        return date;
+      });
+    }
+
+    function isWeekend(date) {
+      const d = date.getDay();
+      return d === 0 || d === 6;
+    }
+
+    function dateKey(date) {
+      return date.toISOString().slice(0, 10);
+    }
+
+    function ShiftApp() {
+      const [today] = React.useState(new Date());
+      const [weekOffset, setWeekOffset] = React.useState(0);
+      const [shifts, setShifts] = React.useState({});
+
+      const baseDate = new Date(today);
+      baseDate.setDate(today.getDate() + weekOffset * 7);
+      const weekDates = getWeekDates(baseDate);
+
+      const toggleShift = (dateStr, slot) => {
+        setShifts((prev) => {
+          const dayShifts = prev[dateStr] || [];
+          const updated = dayShifts.includes(slot)
+            ? dayShifts.filter((s) => s !== slot)
+            : [...dayShifts, slot];
+          return { ...prev, [dateStr]: updated };
+        });
+      };
+
+      const weekLabel = () => {
+        const start = weekDates[0];
+        const end = weekDates[6];
+        return `${start.getMonth() + 1}/${start.getDate()} 〜 ${end.getMonth() + 1}/${end.getDate()}`;
+      };
+
+      const totalHours = (dateStr, slots) => {
+        return (slots || []).length * 1.5;
+      };
+
+      const weeklyHours = weekDates.reduce((acc, d) => {
+        const key = dateKey(d);
+        return acc + totalHours(key, shifts[key]);
+      }, 0);
+
+      const monthlyHours = () => {
+        return Object.values(shifts).reduce((acc, slots) => acc + (slots || []).length * 1.5, 0);
+      };
+
+      return (
+        <div style={{ backgroundColor: "#F7F8FC", minHeight: "100vh", paddingBottom: 32 }}>
+          {/* Header */}
+          <div style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%)", color: "#fff", padding: "20px 20px 16px" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 14 }}>
+              <span style={{ fontSize: 22, fontWeight: 700 }}>📚 シフト管理</span>
+              <span style={{ fontSize: 13, opacity: 0.6 }}>塾バイト</span>
+            </div>
+            <div style={{ display: "flex", gap: 12 }}>
+              {[
+                { num: weeklyHours.toFixed(1), label: "今週 h" },
+                { num: monthlyHours().toFixed(1), label: "累計 h" },
+                { num: Object.values(shifts).flat().length, label: "総コマ数" },
+              ].map((s) => (
+                <div key={s.label} style={{ background: "rgba(255,255,255,0.1)", borderRadius: 10, padding: "8px 16px", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 64 }}>
+                  <span style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>{s.num}</span>
+                  <span style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>{s.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Week Nav */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", background: "#fff", borderBottom: "1px solid #E8E8E8", position: "sticky", top: 0, zIndex: 10 }}>
+            <button onClick={() => setWeekOffset(p => p - 1)} style={{ background: "none", border: "1.5px solid #DDD", borderRadius: 8, width: 36, height: 36, fontSize: 20, cursor: "pointer", color: "#555" }}>‹</button>
+            <span style={{ fontSize: 15, fontWeight: 600, color: "#222" }}>{weekLabel()}</span>
+            <button onClick={() => setWeekOffset(p => p + 1)} style={{ background: "none", border: "1.5px solid #DDD", borderRadius: 8, width: 36, height: 36, fontSize: 20, cursor: "pointer", color: "#555" }}>›</button>
+          </div>
+
+          {/* Day Cards */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 16px" }}>
+            {weekDates.map((date) => {
+              const key = dateKey(date);
+              const weekend = isWeekend(date);
+              const slots = weekend ? WEEKEND_SHIFTS : WEEKDAY_SHIFTS;
+              const selected = shifts[key] || [];
+              const isToday = dateKey(date) === dateKey(today);
+
+              return (
+                <div key={key} style={{
+                  background: weekend ? "#FAFBFF" : "#fff",
+                  borderRadius: 14,
+                  padding: "12px 14px",
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                  border: isToday ? "1.5px solid #0f3460" : "1.5px solid transparent",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, width: 16, color: date.getDay() === 0 ? "#C0556A" : date.getDay() === 6 ? "#6C9BCF" : "#333" }}>
+                      {DAY_NAMES[date.getDay()]}
+                    </span>
+                    <span style={{ fontSize: 20, fontWeight: 700, color: isToday ? "#0f3460" : "#222", lineHeight: 1 }}>
+                      {date.getDate()}
+                    </span>
+                    {isToday && <span style={{ fontSize: 10, background: "#0f3460", color: "#fff", borderRadius: 4, padding: "2px 6px" }}>今日</span>}
+                  </div>
+
+                  <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+                    {slots.map((slot) => {
+                      const info = SHIFT_LABELS[slot];
+                      const active = selected.includes(slot);
+                      return (
+                        <button
+                          key={slot}
+                          onClick={() => toggleShift(key, slot)}
+                          style={{
+                            borderRadius: 10,
+                            padding: "6px 10px",
+                            cursor: "pointer",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            minWidth: 54,
+                            backgroundColor: active ? info.color : "#F0F0F0",
+                            color: active ? "#fff" : "#888",
+                            border: active ? `2px solid ${info.color}` : "2px solid transparent",
+                            outline: "none",
+                          }}
+                        >
+                          <span style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.2 }}>{slot}</span>
+                          <span style={{ fontSize: 9, lineHeight: 1.3, whiteSpace: "nowrap" }}>{info.time}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {selected.length > 0 && (
+                    <div style={{ marginTop: 8, fontSize: 12, color: "#888", textAlign: "right", fontWeight: 600 }}>
+                      {totalHours(key, selected).toFixed(1)} h
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Legend */}
+          <div style={{ margin: "4px 16px 0", background: "#fff", borderRadius: 14, padding: "12px 14px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+            <div style={{ fontSize: 12, color: "#999", marginBottom: 8, fontWeight: 600, letterSpacing: "0.5px" }}>コマ時間帯</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px" }}>
+              {Object.entries(SHIFT_LABELS).filter(([k]) => ["A","B","C","D"].includes(k)).map(([k, v]) => (
+                <div key={k} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: v.color, display: "inline-block" }} />
+                  <span style={{ fontSize: 12, color: "#555" }}>{k}: {v.time}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<ShiftApp />, document.getElementById("root"));
+  </script>
+</body>
+</html>
