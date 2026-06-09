@@ -1,2 +1,30 @@
-This is a must-have scheduling app for cram school tutors to keep their work shifts organized and easy to view.
-I designed the concept myself, and generated the code using Cloud Code's AI.
+# シフト管理アプリ
+
+塾のアルバイトのシフトと給料を簡単に計算・管理ができるWEBサイトです。
+ブラウザのローカルストレージを保存機能として使用しているため、入力したデータは自動的に保存されます。
+
+## 公開URL
+https://yusukehiraoka.github.io/shift/
+
+## 主な機能
+- **自動給料計算**: コマ数を選ぶだけで、今週と今月の給料を自動で計算します。
+- **今日マークの自動移動**: 日付が変わると、自動で「今日」のラベルが移動します。
+- **データ自動保存**: ページを閉じたり、ブラウザをリロードしても入力したシフトが消えません。
+- **完全プライベート**: データは使用している端末のブラウザ内にのみ保存されるため、他人にシフトを見られる心配がありません。
+
+## コマ時間帯
+- **平日 (B, C, D)**
+  - B: 16:40〜18:10
+  - C: 18:15〜19:45
+  - D: 19:50〜21:20
+- **土日 (Y, Z, A, B)**
+  - Y: 11:00〜12:30
+  - Z: 12:35〜14:05
+  - A: 15:05〜16:35
+  - B: 16:40〜18:10
+
+## 🛠 使用している技術
+- HTML5 / CSS3
+- React (18.2.0)
+- Babel (7.23.2)
+- GitHub Pages
