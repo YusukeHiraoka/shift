@@ -54,7 +54,17 @@
     function ShiftApp() {
       const [today] = React.useState(new Date());
       const [weekOffset, setWeekOffset] = React.useState(0);
-      const [shifts, setShifts] = React.useState({});
+      
+      // ① 初期化時にローカルストレージからデータを読み込む
+      const [shifts, setShifts] = React.useState(() => {
+        const savedShifts = localStorage.getItem('juku_shifts');
+        return savedShifts ? JSON.parse(savedShifts) : {};
+      });
+
+      // ② シフトデータが変わるたびにローカルストレージへ自動保存
+      React.useEffect(() => {
+        localStorage.setItem('juku_shifts', JSON.stringify(shifts));
+      }, [shifts]);
 
       const baseDate = new Date(today);
       baseDate.setDate(today.getDate() + weekOffset * 7);
@@ -76,12 +86,10 @@
         return `${start.getMonth() + 1}/${start.getDate()} 〜 ${end.getMonth() + 1}/${end.getDate()}`;
       };
 
-      // 【今週】のコマ数と給料の計算
       const weeklyKoma = weekDates.reduce((acc, d) => acc + (shifts[dateKey(d)] || []).length, 0);
       const weeklySalary = weeklyKoma * UNIT_PRICE;
 
-      // 【今月】（表示している週の月）のコマ数と給料の計算
-      const currentMonth = weekDates[2].getMonth(); // 週の中央（水曜）を基準の月とする
+      const currentMonth = weekDates[2].getMonth();
       const currentYear = weekDates[2].getFullYear();
 
       const monthlyKoma = Object.entries(shifts).reduce((acc, [dateStr, dayShifts]) => {
