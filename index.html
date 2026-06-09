@@ -16,6 +16,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
+    const UNIT_PRICE = 1800;
     const WEEKDAY_SHIFTS = ["B", "C", "D"];
     const WEEKEND_SHIFTS = ["Y", "Z", "A", "B"];
 
@@ -24,8 +25,8 @@
       B: { label: "B", time: "16:40〜18:10", color: "#5BAD8F" },
       C: { label: "C", time: "18:15〜19:45", color: "#E07B54" },
       D: { label: "D", time: "19:50〜21:20", color: "#9B6BB5" },
-      Y: { label: "Y", time: "（午前）", color: "#D4A843" },
-      Z: { label: "Z", time: "（午後）", color: "#C0556A" },
+      Y: { label: "Y", time: "11:00〜12:30", color: "#D4A843" },
+      Z: { label: "Z", time: "12:35〜14:05", color: "#C0556A" },
     };
 
     const DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"];
@@ -43,8 +44,7 @@
     }
 
     function isWeekend(date) {
-      const d = date.getDay();
-      return d === 0 || d === 6;
+      return date.getDay() === 0 || date.getDay() === 6;
     }
 
     function dateKey(date) {
@@ -76,18 +76,22 @@
         return `${start.getMonth() + 1}/${start.getDate()} 〜 ${end.getMonth() + 1}/${end.getDate()}`;
       };
 
-      const totalHours = (dateStr, slots) => {
-        return (slots || []).length * 1.5;
-      };
+      // 【今週】のコマ数と給料の計算
+      const weeklyKoma = weekDates.reduce((acc, d) => acc + (shifts[dateKey(d)] || []).length, 0);
+      const weeklySalary = weeklyKoma * UNIT_PRICE;
 
-      const weeklyHours = weekDates.reduce((acc, d) => {
-        const key = dateKey(d);
-        return acc + totalHours(key, shifts[key]);
+      // 【今月】（表示している週の月）のコマ数と給料の計算
+      const currentMonth = weekDates[2].getMonth(); // 週の中央（水曜）を基準の月とする
+      const currentYear = weekDates[2].getFullYear();
+
+      const monthlyKoma = Object.entries(shifts).reduce((acc, [dateStr, dayShifts]) => {
+        const d = new Date(dateStr);
+        if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+          return acc + dayShifts.length;
+        }
+        return acc;
       }, 0);
-
-      const monthlyHours = () => {
-        return Object.values(shifts).reduce((acc, slots) => acc + (slots || []).length * 1.5, 0);
-      };
+      const monthlySalary = monthlyKoma * UNIT_PRICE;
 
       return (
         <div style={{ backgroundColor: "#F7F8FC", minHeight: "100vh", paddingBottom: 32 }}>
@@ -97,15 +101,16 @@
               <span style={{ fontSize: 22, fontWeight: 700 }}>📚 シフト管理</span>
               <span style={{ fontSize: 13, opacity: 0.6 }}>塾バイト</span>
             </div>
-            <div style={{ display: "flex", gap: 12 }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               {[
-                { num: weeklyHours.toFixed(1), label: "今週 h" },
-                { num: monthlyHours().toFixed(1), label: "累計 h" },
-                { num: Object.values(shifts).flat().length, label: "総コマ数" },
+                { num: weeklyKoma + "コマ", label: "今週" },
+                { num: "¥" + weeklySalary.toLocaleString(), label: "今週給料" },
+                { num: monthlyKoma + "コマ", label: `${currentMonth + 1}月合計` },
+                { num: "¥" + monthlySalary.toLocaleString(), label: `${currentMonth + 1}月給料` },
               ].map((s) => (
-                <div key={s.label} style={{ background: "rgba(255,255,255,0.1)", borderRadius: 10, padding: "8px 16px", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 64 }}>
-                  <span style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>{s.num}</span>
-                  <span style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>{s.label}</span>
+                <div key={s.label} style={{ background: "rgba(255,255,255,0.1)", borderRadius: 10, padding: "8px 12px", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 75 }}>
+                  <span style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.2 }}>{s.num}</span>
+                  <span style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>{s.label}</span>
                 </div>
               ))}
             </div>
@@ -126,6 +131,7 @@
               const slots = weekend ? WEEKEND_SHIFTS : WEEKDAY_SHIFTS;
               const selected = shifts[key] || [];
               const isToday = dateKey(date) === dateKey(today);
+              const daySalary = selected.length * UNIT_PRICE;
 
               return (
                 <div key={key} style={{
@@ -143,6 +149,11 @@
                       {date.getDate()}
                     </span>
                     {isToday && <span style={{ fontSize: 10, background: "#0f3460", color: "#fff", borderRadius: 4, padding: "2px 6px" }}>今日</span>}
+                    {selected.length > 0 && (
+                      <span style={{ marginLeft: "auto", fontSize: 13, fontWeight: 700, color: "#5BAD8F" }}>
+                        ¥{daySalary.toLocaleString()}
+                      </span>
+                    )}
                   </div>
 
                   <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
@@ -173,12 +184,6 @@
                       );
                     })}
                   </div>
-
-                  {selected.length > 0 && (
-                    <div style={{ marginTop: 8, fontSize: 12, color: "#888", textAlign: "right", fontWeight: 600 }}>
-                      {totalHours(key, selected).toFixed(1)} h
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -186,9 +191,9 @@
 
           {/* Legend */}
           <div style={{ margin: "4px 16px 0", background: "#fff", borderRadius: 14, padding: "12px 14px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-            <div style={{ fontSize: 12, color: "#999", marginBottom: 8, fontWeight: 600, letterSpacing: "0.5px" }}>コマ時間帯</div>
+            <div style={{ fontSize: 12, color: "#999", marginBottom: 8, fontWeight: 600, letterSpacing: "0.5px" }}>コマ時間帯（1コマ ¥1,800）</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px" }}>
-              {Object.entries(SHIFT_LABELS).filter(([k]) => ["A","B","C","D"].includes(k)).map(([k, v]) => (
+              {Object.entries(SHIFT_LABELS).map(([k, v]) => (
                 <div key={k} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: v.color, display: "inline-block" }} />
                   <span style={{ fontSize: 12, color: "#555" }}>{k}: {v.time}</span>
