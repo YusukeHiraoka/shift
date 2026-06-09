@@ -10,6 +10,15 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #F7F8FC; font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif; }
+    .mode-toggle { display: flex; border-radius: 12px; overflow: hidden; border: 2px solid #DDD; }
+    .mode-btn { flex: 1; padding: 8px 0; font-size: 13px; font-weight: 700; cursor: pointer; border: none; transition: all 0.2s; }
+    .mode-btn.hope { background: #f0f4ff; color: #6C9BCF; }
+    .mode-btn.hope.active { background: #6C9BCF; color: #fff; }
+    .mode-btn.confirm { background: #f0fff8; color: #2e8a5e; }
+    .mode-btn.confirm.active { background: #2e8a5e; color: #fff; }
+    .mode-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 20px; }
+    .mode-badge.hope { background: rgba(108,155,207,0.15); color: #6C9BCF; }
+    .mode-badge.confirm { background: rgba(46,138,94,0.15); color: #2e8a5e; }
   </style>
 </head>
 <body>
@@ -20,13 +29,14 @@
     const WEEKDAY_SHIFTS = ["B", "C", "D"];
     const WEEKEND_SHIFTS = ["Y", "Z", "A", "B"];
 
+    // 各コマの基本色（濃い）と希望色（薄い）
     const SHIFT_LABELS = {
-      A: { label: "A", time: "15:05〜16:35", color: "#6C9BCF" },
-      B: { label: "B", time: "16:40〜18:10", color: "#5BAD8F" },
-      C: { label: "C", time: "18:15〜19:45", color: "#E07B54" },
-      D: { label: "D", time: "19:50〜21:20", color: "#9B6BB5" },
-      Y: { label: "Y", time: "11:00〜12:30", color: "#D4A843" },
-      Z: { label: "Z", time: "12:35〜14:05", color: "#C0556A" },
+      A: { label: "A", time: "15:05〜16:35", color: "#6C9BCF", hopeColor: "#c5dcf0" },
+      B: { label: "B", time: "16:40〜18:10", color: "#5BAD8F", hopeColor: "#b8e4d4" },
+      C: { label: "C", time: "18:15〜19:45", color: "#E07B54", hopeColor: "#f5c9b8" },
+      D: { label: "D", time: "19:50〜21:20", color: "#9B6BB5", hopeColor: "#dcc5ed" },
+      Y: { label: "Y", time: "11:00〜12:30", color: "#C8942A", hopeColor: "#f0dba8" },
+      Z: { label: "Z", time: "12:35〜14:05", color: "#C0556A", hopeColor: "#f0b8c4" },
     };
 
     const DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"];
@@ -54,30 +64,37 @@
     function ShiftApp() {
       const [today] = React.useState(new Date());
       const [weekOffset, setWeekOffset] = React.useState(0);
-      
-      // ① 初期化時にローカルストレージからデータを読み込む
-      const [shifts, setShifts] = React.useState(() => {
-        const savedShifts = localStorage.getItem('juku_shifts');
-        return savedShifts ? JSON.parse(savedShifts) : {};
-      });
-
-      // ② シフトデータが変わるたびにローカルストレージへ自動保存
-      React.useEffect(() => {
-        localStorage.setItem('juku_shifts', JSON.stringify(shifts));
-      }, [shifts]);
+      // hopeShifts: 希望シフト { dateKey: [slot, ...] }
+      // confirmedShifts: 確定シフト { dateKey: [slot, ...] }
+      const [hopeShifts, setHopeShifts] = React.useState({});
+      const [confirmedShifts, setConfirmedShifts] = React.useState({});
+      const [mode, setMode] = React.useState("hope"); // "hope" | "confirm"
 
       const baseDate = new Date(today);
       baseDate.setDate(today.getDate() + weekOffset * 7);
       const weekDates = getWeekDates(baseDate);
 
       const toggleShift = (dateStr, slot) => {
-        setShifts((prev) => {
-          const dayShifts = prev[dateStr] || [];
-          const updated = dayShifts.includes(slot)
-            ? dayShifts.filter((s) => s !== slot)
-            : [...dayShifts, slot];
-          return { ...prev, [dateStr]: updated };
-        });
+        if (mode === "hope") {
+          setHopeShifts((prev) => {
+            const cur = prev[dateStr] || [];
+            const updated = cur.includes(slot) ? cur.filter(s => s !== slot) : [...cur, slot];
+            return { ...prev, [dateStr]: updated };
+          });
+        } else {
+          setConfirmedShifts((prev) => {
+            const cur = prev[dateStr] || [];
+            const updated = cur.includes(slot) ? cur.filter(s => s !== slot) : [...cur, slot];
+            return { ...prev, [dateStr]: updated };
+          });
+        }
+      };
+
+      // ボタンの状態: "confirmed" > "hope" > "none"
+      const getSlotState = (dateStr, slot) => {
+        if ((confirmedShifts[dateStr] || []).includes(slot)) return "confirmed";
+        if ((hopeShifts[dateStr] || []).includes(slot)) return "hope";
+        return "none";
       };
 
       const weekLabel = () => {
@@ -86,48 +103,75 @@
         return `${start.getMonth() + 1}/${start.getDate()} 〜 ${end.getMonth() + 1}/${end.getDate()}`;
       };
 
-      const weeklyKoma = weekDates.reduce((acc, d) => acc + (shifts[dateKey(d)] || []).length, 0);
-      const weeklySalary = weeklyKoma * UNIT_PRICE;
+      const totalConfirmedKoma = Object.values(confirmedShifts).flat().length;
+      const weeklyConfirmedKoma = weekDates.reduce((acc, d) => acc + (confirmedShifts[dateKey(d)] || []).length, 0);
+      const weeklySalary = weeklyConfirmedKoma * UNIT_PRICE;
+      const monthlySalary = totalConfirmedKoma * UNIT_PRICE;
 
-      const currentMonth = weekDates[2].getMonth();
-      const currentYear = weekDates[2].getFullYear();
-
-      const monthlyKoma = Object.entries(shifts).reduce((acc, [dateStr, dayShifts]) => {
-        const d = new Date(dateStr);
-        if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
-          return acc + dayShifts.length;
-        }
-        return acc;
-      }, 0);
-      const monthlySalary = monthlyKoma * UNIT_PRICE;
+      const totalHopeKoma = Object.values(hopeShifts).flat().length;
+      const weeklyHopeKoma = weekDates.reduce((acc, d) => acc + (hopeShifts[dateKey(d)] || []).length, 0);
 
       return (
-        <div style={{ backgroundColor: "#F7F8FC", minHeight: "100vh", paddingBottom: 32 }}>
+        <div style={{ backgroundColor: "#F7F8FC", minHeight: "100vh", paddingBottom: 40 }}>
+
           {/* Header */}
           <div style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%)", color: "#fff", padding: "20px 20px 16px" }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 14 }}>
-              <span style={{ fontSize: 22, fontWeight: 700 }}>📚 シフト管理</span>
-              <span style={{ fontSize: 13, opacity: 0.6 }}>塾バイト</span>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+                <span style={{ fontSize: 22, fontWeight: 700 }}>📚 シフト管理</span>
+                <span style={{ fontSize: 13, opacity: 0.6 }}>塾バイト</span>
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+
+            {/* Stats */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
               {[
-                { num: weeklyKoma + "コマ", label: "今週" },
-                { num: "¥" + weeklySalary.toLocaleString(), label: "今週給料" },
-                { num: monthlyKoma + "コマ", label: `${currentMonth + 1}月合計` },
-                { num: "¥" + monthlySalary.toLocaleString(), label: `${currentMonth + 1}月給料` },
+                { num: weeklyConfirmedKoma + "コマ", label: "今週確定", color: "rgba(91,173,143,0.25)" },
+                { num: "¥" + weeklySalary.toLocaleString(), label: "今週給料", color: "rgba(91,173,143,0.25)" },
+                { num: totalConfirmedKoma + "コマ", label: "累計確定", color: "rgba(255,255,255,0.1)" },
+                { num: "¥" + monthlySalary.toLocaleString(), label: "累計給料", color: "rgba(255,255,255,0.1)" },
               ].map((s) => (
-                <div key={s.label} style={{ background: "rgba(255,255,255,0.1)", borderRadius: 10, padding: "8px 12px", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 75 }}>
-                  <span style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.2 }}>{s.num}</span>
-                  <span style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>{s.label}</span>
+                <div key={s.label} style={{ background: s.color, borderRadius: 10, padding: "7px 12px", display: "flex", flexDirection: "column", alignItems: "center", minWidth: 58 }}>
+                  <span style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.2 }}>{s.num}</span>
+                  <span style={{ fontSize: 10, opacity: 0.75, marginTop: 1 }}>{s.label}</span>
                 </div>
               ))}
+            </div>
+
+            {/* Mode Toggle */}
+            <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 14, padding: "10px 12px" }}>
+              <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 8, letterSpacing: "0.5px", fontWeight: 600 }}>入力モード</div>
+              <div className="mode-toggle">
+                <button
+                  className={"mode-btn hope" + (mode === "hope" ? " active" : "")}
+                  onClick={() => setMode("hope")}
+                >
+                  🙋 シフト希望
+                </button>
+                <button
+                  className={"mode-btn confirm" + (mode === "confirm" ? " active" : "")}
+                  onClick={() => setMode("confirm")}
+                >
+                  ✅ シフト確定
+                </button>
+              </div>
+              <div style={{ marginTop: 8, fontSize: 11, opacity: 0.65, lineHeight: 1.5 }}>
+                {mode === "hope"
+                  ? "💡 希望日程を薄い色でマーク。シフト発表後に確定モードで上書きしよう"
+                  : "💡 確定したコマを濃い色でマーク。給料計算は確定コマのみ"}
+              </div>
             </div>
           </div>
 
           {/* Week Nav */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", background: "#fff", borderBottom: "1px solid #E8E8E8", position: "sticky", top: 0, zIndex: 10 }}>
             <button onClick={() => setWeekOffset(p => p - 1)} style={{ background: "none", border: "1.5px solid #DDD", borderRadius: 8, width: 36, height: 36, fontSize: 20, cursor: "pointer", color: "#555" }}>‹</button>
-            <span style={{ fontSize: 15, fontWeight: 600, color: "#222" }}>{weekLabel()}</span>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+              <span style={{ fontSize: 15, fontWeight: 600, color: "#222" }}>{weekLabel()}</span>
+              <span className={"mode-badge " + mode}>
+                {mode === "hope" ? "🙋 希望モード" : "✅ 確定モード"}
+              </span>
+            </div>
             <button onClick={() => setWeekOffset(p => p + 1)} style={{ background: "none", border: "1.5px solid #DDD", borderRadius: 8, width: 36, height: 36, fontSize: 20, cursor: "pointer", color: "#555" }}>›</button>
           </div>
 
@@ -137,9 +181,10 @@
               const key = dateKey(date);
               const weekend = isWeekend(date);
               const slots = weekend ? WEEKEND_SHIFTS : WEEKDAY_SHIFTS;
-              const selected = shifts[key] || [];
               const isToday = dateKey(date) === dateKey(today);
-              const daySalary = selected.length * UNIT_PRICE;
+              const confirmedSlots = confirmedShifts[key] || [];
+              const hopeSlots = hopeShifts[key] || [];
+              const daySalary = confirmedSlots.length * UNIT_PRICE;
 
               return (
                 <div key={key} style={{
@@ -157,17 +202,41 @@
                       {date.getDate()}
                     </span>
                     {isToday && <span style={{ fontSize: 10, background: "#0f3460", color: "#fff", borderRadius: 4, padding: "2px 6px" }}>今日</span>}
-                    {selected.length > 0 && (
-                      <span style={{ marginLeft: "auto", fontSize: 13, fontWeight: 700, color: "#5BAD8F" }}>
-                        ¥{daySalary.toLocaleString()}
-                      </span>
-                    )}
+
+                    {/* 右側ステータス */}
+                    <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+                      {hopeSlots.length > 0 && confirmedSlots.length === 0 && (
+                        <span style={{ fontSize: 11, color: "#6C9BCF", fontWeight: 600 }}>希望 {hopeSlots.length}コマ</span>
+                      )}
+                      {confirmedSlots.length > 0 && (
+                        <span style={{ fontSize: 13, fontWeight: 700, color: "#2e8a5e" }}>¥{daySalary.toLocaleString()}</span>
+                      )}
+                    </div>
                   </div>
 
                   <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
                     {slots.map((slot) => {
                       const info = SHIFT_LABELS[slot];
-                      const active = selected.includes(slot);
+                      const state = getSlotState(key, slot); // "confirmed" | "hope" | "none"
+
+                      let bgColor = "#F0F0F0";
+                      let textColor = "#AAA";
+                      let borderColor = "transparent";
+                      let opacity = 1;
+
+                      if (state === "confirmed") {
+                        bgColor = info.color;
+                        textColor = "#fff";
+                        borderColor = info.color;
+                      } else if (state === "hope") {
+                        bgColor = info.hopeColor;
+                        textColor = info.color;
+                        borderColor = info.hopeColor;
+                      }
+
+                      // 現在のモードで操作できるものはホバー感を出す
+                      const isActive = mode === "hope" ? state === "hope" : state === "confirmed";
+
                       return (
                         <button
                           key={slot}
@@ -180,14 +249,24 @@
                             flexDirection: "column",
                             alignItems: "center",
                             minWidth: 54,
-                            backgroundColor: active ? info.color : "#F0F0F0",
-                            color: active ? "#fff" : "#888",
-                            border: active ? `2px solid ${info.color}` : "2px solid transparent",
+                            backgroundColor: bgColor,
+                            color: textColor,
+                            border: `2px solid ${borderColor}`,
                             outline: "none",
+                            transition: "all 0.15s ease",
+                            position: "relative",
                           }}
                         >
                           <span style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.2 }}>{slot}</span>
                           <span style={{ fontSize: 9, lineHeight: 1.3, whiteSpace: "nowrap" }}>{info.time}</span>
+                          {/* 確定済みバッジ */}
+                          {state === "confirmed" && (
+                            <span style={{ position: "absolute", top: -5, right: -5, background: "#2e8a5e", borderRadius: "50%", width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, color: "#fff", fontWeight: 700 }}>✓</span>
+                          )}
+                          {/* 希望バッジ */}
+                          {state === "hope" && (
+                            <span style={{ position: "absolute", top: -5, right: -5, background: "#6C9BCF", borderRadius: "50%", width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8, color: "#fff", fontWeight: 700 }}>?</span>
+                          )}
                         </button>
                       );
                     })}
@@ -199,12 +278,28 @@
 
           {/* Legend */}
           <div style={{ margin: "4px 16px 0", background: "#fff", borderRadius: 14, padding: "12px 14px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
-            <div style={{ fontSize: 12, color: "#999", marginBottom: 8, fontWeight: 600, letterSpacing: "0.5px" }}>コマ時間帯（1コマ ¥1,800）</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px" }}>
+            <div style={{ fontSize: 12, color: "#999", marginBottom: 10, fontWeight: 600, letterSpacing: "0.5px" }}>凡例（1コマ ¥1,800）</div>
+            <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <span style={{ width: 22, height: 22, borderRadius: 6, background: "#b8e4d4", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#5BAD8F", fontWeight: 700, position: "relative" }}>
+                  B
+                  <span style={{ position: "absolute", top: -4, right: -4, background: "#6C9BCF", borderRadius: "50%", width: 10, height: 10, fontSize: 6, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>?</span>
+                </span>
+                <span style={{ fontSize: 11, color: "#888" }}>希望</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <span style={{ width: 22, height: 22, borderRadius: 6, background: "#5BAD8F", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: "#fff", fontWeight: 700, position: "relative" }}>
+                  B
+                  <span style={{ position: "absolute", top: -4, right: -4, background: "#2e8a5e", borderRadius: "50%", width: 10, height: 10, fontSize: 6, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>✓</span>
+                </span>
+                <span style={{ fontSize: 11, color: "#888" }}>確定</span>
+              </div>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px" }}>
               {Object.entries(SHIFT_LABELS).map(([k, v]) => (
-                <div key={k} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div key={k} style={{ display: "flex", alignItems: "center", gap: 5 }}>
                   <span style={{ width: 10, height: 10, borderRadius: "50%", backgroundColor: v.color, display: "inline-block" }} />
-                  <span style={{ fontSize: 12, color: "#555" }}>{k}: {v.time}</span>
+                  <span style={{ fontSize: 11, color: "#555" }}>{k}: {v.time}</span>
                 </div>
               ))}
             </div>
